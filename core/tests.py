@@ -1,5 +1,8 @@
 from django.test import TestCase
 from .models import * 
+from .views import * 
+from rest_framework.test import APITestCase
+from django.urls import reverse
 
 # Create your tests here.
 class ObjectInContainerTestCase(TestCase):
@@ -131,3 +134,29 @@ class ObjectInContainerTestCase(TestCase):
             self.fail(f"Should fail because it has {self._startup_container_count} products, but requested {self._startup_container_count + 1}")
         except RequestedToMoveMoreThanContainError:
             pass
+
+
+class ProductViewTest(APITestCase):
+    def setUp(self):
+        ProductCode.objects.create(id='X000000001', name='Test-Product', weight=100)
+        self._product_page = 'product'
+
+    def test_raises_error_when_empty_product_id(self):
+        response = self.client.get(reverse(self._product_page, 
+            kwargs={'product_id': 'X000000000'}))
+
+        self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
+
+    def test_raises_error_when_retrieving_not_existing_product(self):
+        response = self.client.get(reverse(self._product_page, 
+            kwargs={'product_id': 'X000000000'}))
+        self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
+
+    def test_returns_object_when_passing_valid_code(self):
+        response = self.client.get(reverse(self._product_page, 
+            kwargs={'product_id': 'X000000001'}))
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        response_data = response.json()
+        self.assertEqual(response_data['id'], 'X000000001')
+        self.assertEqual(response_data['name'], 'Test-Product')
