@@ -120,3 +120,14 @@ class ObjectInContainerTestCase(TestCase):
             self.fail('Should fail because max weight per product is reached')
         except ProductTooHeavyToLocationError:
             pass
+
+
+    def test_transfer_fails_if_doesnt_have_more_than_requested_products(self):
+        objects = ObjectInContainer.objects.get(product_id=self._test_product_id)
+        tote = Tote.objects.get(pk='tsXDD0000000')
+
+        try:
+            objects.transfer_to_tote(tote, self._startup_container_count + 1)
+            self.fail(f"Should fail because it has {self._startup_container_count} products, but requested {self._startup_container_count + 1}")
+        except RequestedToMoveMoreThanContainError:
+            pass

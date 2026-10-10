@@ -87,6 +87,9 @@ class ProductTooHeavyToLocationError(Exception):
 class ReachedCodeCapacityError(Exception):
     pass
 
+class RequestedToMoveMoreThanContainError(Exception):
+    pass
+
 class ObjectInContainer(models.Model):
     class Status(models.IntegerChoices):
         Inbound = 0
@@ -118,12 +121,19 @@ class ObjectInContainer(models.Model):
         objects_in_location = ObjectInContainer.objects.filter(location=location)
         self._run_location_checks(location, count, objects_in_location)
 
+        if count > self.count:
+            raise RequestedToMoveMoreThanContainError()
+
         with transaction.atomic():
             self._transactioned_move_objects_to_location(location=location, count=count, same_products_in_location=same_products_in_location, objects_in_location=objects_in_location)
 
     def _transfer_to_new_container(self, count, **find_container_kwargs):
         objects = ObjectInContainer.objects.filter(product=self.product, 
                                                    **find_container_kwargs)
+
+        if count > self.count:
+            raise RequestedToMoveMoreThanContainError()
+        
         with transaction.atomic():
             if not objects.exists():
                 self._create_new_container_with_objects(count, **find_container_kwargs)
