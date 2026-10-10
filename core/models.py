@@ -61,7 +61,7 @@ class Location(models.Model):
     max_weight = models.IntegerField(validators=[MinValueValidator(1000)])
     max_weight_per_product = models.IntegerField(validators=[MinValueValidator(1000)])
     code_capacity = models.IntegerField(default=5)
-    can_store_damaged_items = models.BooleanField(default=False)
+    stores_damaged_items = models.BooleanField(default=False)
 
     class Meta:
         constraints = [
@@ -123,6 +123,9 @@ class ObjectInContainer(models.Model):
         if count > self.count:
             raise RequestedToMoveMoreThanContainError()
 
+        if location.stores_damaged_items != self.damaged:
+            raise ProductConditionMismatchError()
+        
         with transaction.atomic():
             objects, created = ObjectInContainer.objects.get_or_create(
                             product = self.product,
