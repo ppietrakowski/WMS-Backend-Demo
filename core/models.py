@@ -113,13 +113,13 @@ class ObjectInContainer(models.Model):
         self._transfer_to_new_container(count, container=container)
 
     def transfer_to_location(self, location: Location, count: int):
-        objects = ObjectInContainer.objects.filter(product=self.product, 
+        same_products_in_location = ObjectInContainer.objects.filter(product=self.product, 
                                                            location=location)
         objects_in_location = ObjectInContainer.objects.filter(location=location)
         self._run_location_checks(location, count, objects_in_location)
 
         with transaction.atomic():
-            self._transactioned_move_objects_to_location(location=location, count=count, objects=objects, objects_in_location=objects_in_location)
+            self._transactioned_move_objects_to_location(location=location, count=count, same_products_in_location=same_products_in_location, objects_in_location=objects_in_location)
 
     def _transfer_to_new_container(self, count, **find_container_kwargs):
         objects = ObjectInContainer.objects.filter(product=self.product, 
@@ -146,10 +146,10 @@ class ObjectInContainer(models.Model):
     def _transactioned_move_objects_to_location(self, **kwargs):
         location = kwargs['location']
         count = kwargs['count']
-        objects = kwargs['objects']
+        same_products_in_location = kwargs['same_products_in_location']
         objects_in_location = kwargs['objects_in_location']
 
-        if not objects.exists():
+        if not same_products_in_location.exists():
             if len(objects_in_location) == location.code_capacity:
                 raise ReachedCodeCapacityError()
 
