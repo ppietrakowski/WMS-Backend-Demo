@@ -81,7 +81,7 @@ CORS_ALLOWED_ORIGIN_REGEXES = [
     r"^http://10\.\d+\.\d+\.\d+(:\d+)?$",
 ]
 
-ROOT_URLCONF = 'base.urls'
+ROOT_URLCONF = 'wms.urls'
 
 TEMPLATES = [
     {
