@@ -9,3 +9,5 @@ backend/.env
 **/migrations/**/*
 
 .env
+
+**/*/migrations/**/*
