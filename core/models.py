@@ -61,6 +61,7 @@ class Location(models.Model):
     max_weight = models.IntegerField(validators=[MinValueValidator(1000)])
     max_weight_per_product = models.IntegerField(validators=[MinValueValidator(1000)])
     code_capacity = models.IntegerField(default=5)
+    can_store_damaged_items = models.BooleanField(default=False)
 
     class Meta:
         constraints = [
@@ -116,8 +117,6 @@ class ObjectInContainer(models.Model):
         self._transfer_to_new_container(count, container=container)
 
     def transfer_to_location(self, location: Location, count: int):
-        same_products_in_location = ObjectInContainer.objects.filter(product=self.product, 
-                                                           location=location)
         objects_in_location = ObjectInContainer.objects.filter(location=location)
         self._run_location_checks(location, count, objects_in_location)
 
@@ -125,20 +124,40 @@ class ObjectInContainer(models.Model):
             raise RequestedToMoveMoreThanContainError()
 
         with transaction.atomic():
-            self._transactioned_move_objects_to_location(location=location, count=count, same_products_in_location=same_products_in_location, objects_in_location=objects_in_location)
+            objects, created = ObjectInContainer.objects.get_or_create(
+                            product = self.product,
+                            location=location,
+                            defaults={'count': count}
+                        )
+                        
+            if not created:
+                if objects.damaged != self.damaged:
+                    raise ProductConditionMismatchError()
+                objects.count += count
+                objects.save()
+            else:
+                if len(objects_in_location) == location.code_capacity:
+                    # after this raise, db will revert back to state before 'with' block
+                    raise ReachedCodeCapacityError()
+                
+            self._transfer_out_self(count)
 
     def _transfer_to_new_container(self, count, **find_container_kwargs):
-        objects = ObjectInContainer.objects.filter(product=self.product, 
-                                                   **find_container_kwargs)
-
         if count > self.count:
             raise RequestedToMoveMoreThanContainError()
         
         with transaction.atomic():
-            if not objects.exists():
-                self._create_new_container_with_objects(count, **find_container_kwargs)
-            else:
-                self._transfer_to_existing_tote(count, tote_objects=objects.first())
+            objects, created = ObjectInContainer.objects.get_or_create(
+                product = self.product,
+                **find_container_kwargs,
+                defaults={'count': count}
+            )
+
+            if not created:
+                if objects.damaged != self.damaged:
+                    raise ProductConditionMismatchError()
+                objects.count += count
+                objects.save()
 
             self._transfer_out_self(count)
 
@@ -153,24 +172,6 @@ class ObjectInContainer(models.Model):
         if self.product.weight > location.max_weight_per_product:
             raise ProductTooHeavyToLocationError()
 
-    def _transactioned_move_objects_to_location(self, **kwargs):
-        location = kwargs['location']
-        count = kwargs['count']
-        same_products_in_location = kwargs['same_products_in_location']
-        objects_in_location = kwargs['objects_in_location']
-
-        if not same_products_in_location.exists():
-            if len(objects_in_location) == location.code_capacity:
-                raise ReachedCodeCapacityError()
-
-            # now len(objects_in_location) += 1 
-            self._create_new_container_with_objects(count, location=location)
-
-        self._transfer_out_self(count)
-    
-    def _create_new_container_with_objects(self, count, **kwargs):
-        ObjectInContainer.objects.create(product=self.product, count=count, **kwargs)
-
     def _transfer_out_self(self, count):
         self.count -= count
 
@@ -178,13 +179,6 @@ class ObjectInContainer(models.Model):
             self.save()
         else:
             self.delete()
-
-    def _transfer_to_existing_tote(self, count, tote_objects):
-        if tote_objects.damaged != self.damaged:
-            raise ProductConditionMismatchError()
-            
-        tote_objects.count += count
-        tote_objects.save()
 
     class Meta:
         constraints = [

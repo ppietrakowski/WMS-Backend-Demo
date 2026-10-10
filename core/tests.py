@@ -160,3 +160,61 @@ class ProductViewTest(APITestCase):
         response_data = response.json()
         self.assertEqual(response_data['id'], 'X000000001')
         self.assertEqual(response_data['name'], 'Test-Product')
+
+
+class ContainerItemViewTestCase(APITestCase):
+    def setUp(self):
+        self.product = ProductCode.objects.create(id='X000000001', name='Test-Product', weight=100)
+        ProductCode.objects.create(id='X000000002', name='Test-Product', weight=100)
+        self.tote = Tote.objects.create(id='ts00000000100')
+        self._product_page = 'container_items'
+        return super().setUp()
+
+    def test_raises_error_when_empty_product_id(self):
+        response = self.client.get(reverse(self._product_page, 
+            kwargs={'container_id': self.tote.id}))
+
+        self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
+
+    def test_returns_tote_objects(self):
+        ObjectInContainer.objects.create(tote=self.tote, product=self.product)
+        ObjectInContainer.objects.create(tote=self.tote, product_id='X000000002', count=3)
+        response = self.client.get(reverse(self._product_page, 
+            kwargs={'container_id': self.tote.id}))
+
+        result = response.json()
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(result['container'], self.tote.id)
+
+        products = [i['product'] for i in result['products']]
+        
+        self.assertTrue('X000000002' in products)
+        self.assertTrue('X000000001' in products)
+
+    def test_add_item_endpoints_validates_data(self):
+        response = self.client.post(reverse('add_container_items', 
+                    kwargs={'container_id': self.tote.id}))
+
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+
+    def test_add_item_endpoint_adds_item_to_location(self):
+        response = self.client.post(reverse('add_container_items', 
+                    kwargs={'container_id': self.tote.id}), data = {
+                        'product': self.product.id,
+                        'count': 4,
+                        'damaged': True,
+                    })
+
+        self.assertIn(response.status_code, [status.HTTP_200_OK, status.HTTP_201_CREATED])
+            
+    def test_add_item_endpoint_cannot_mismatch_damaged_item_with_sellable(self):
+        ObjectInContainer.objects.create(tote=self.tote, product=self.product)
+        response = self.client.post(reverse('add_container_items', 
+                        kwargs={'container_id': self.tote.id}), data = {
+                            'product': self.product.id,
+                            'count': 4,
+                            'damaged': True,
+                        })
+    
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+              
