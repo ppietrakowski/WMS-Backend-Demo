@@ -6,13 +6,6 @@ from django.db import transaction
 # Create your models here.
 
 class ProductCode(models.Model):
-    id = models.CharField(max_length=10, null=False, primary_key=True)
-    name = models.CharField(max_length=100)
-    weight = models.IntegerField(default=10)
-
-    def __str__(self):
-        return self.id
-
     class Meta:
         constraints = [
             models.CheckConstraint(
@@ -21,17 +14,19 @@ class ProductCode(models.Model):
             ),
         ]
 
+    id = models.CharField(max_length=10, null=False, primary_key=True)
+    name = models.CharField(max_length=100)
+    weight = models.IntegerField(default=10)
+
+    def __str__(self):
+        return f'{self.name}[{self.id}]'
+
 
 class ShipId(models.Model):
     id = models.CharField(max_length=12, primary_key=True)
 
 
 class Tote(models.Model):
-    """
-    Starts with ts
-    """
-    id = models.CharField(max_length=12, primary_key=True)
-
     class Meta:
         constraints = [
             models.CheckConstraint(
@@ -40,13 +35,13 @@ class Tote(models.Model):
             ),
         ]
 
-
-class Container(models.Model):
     """
-    Starts with cs
+    Starts with ts
     """
     id = models.CharField(max_length=12, primary_key=True)
 
+
+class Container(models.Model):
     class Meta:
         constraints = [
             models.CheckConstraint(
@@ -55,14 +50,13 @@ class Container(models.Model):
             ),
         ]
 
-class Location(models.Model):
-    # starts with lo
+    """
+    Starts with cs
+    """
     id = models.CharField(max_length=12, primary_key=True)
-    max_weight = models.IntegerField(validators=[MinValueValidator(1000)])
-    max_weight_per_product = models.IntegerField(validators=[MinValueValidator(1000)])
-    code_capacity = models.IntegerField(default=5)
-    stores_damaged_items = models.BooleanField(default=False)
 
+
+class Location(models.Model):
     class Meta:
         constraints = [
             models.CheckConstraint(
@@ -74,6 +68,14 @@ class Location(models.Model):
                 name='max_weigth_gte_max_weight_per_product'
             )
         ]
+
+    # starts with lo
+    id = models.CharField(max_length=12, primary_key=True)
+    max_weight = models.IntegerField(validators=[MinValueValidator(1000)])
+    max_weight_per_product = models.IntegerField(validators=[MinValueValidator(1000)])
+    code_capacity = models.IntegerField(default=5)
+    stores_damaged_items = models.BooleanField(default=False)
+
 
 
 class ProductConditionMismatchError(Exception):
@@ -99,6 +101,14 @@ class ObjectInContainer(models.Model):
         Reserved = 2
         Shipped = 3
 
+    class Meta:
+        constraints = [
+            models.CheckConstraint(
+                condition=models.Q(count__gte=0),
+                name='count_at_least_zero'
+            )
+        ]
+        
     product = models.ForeignKey(ProductCode, on_delete=models.CASCADE)
     status = models.IntegerField(choices=Status, default=Status.Inbound)
     count = models.IntegerField(default=1)
@@ -206,13 +216,6 @@ class ObjectInContainer(models.Model):
 
         return num_products
 
-    class Meta:
-        constraints = [
-            models.CheckConstraint(
-                condition=models.Q(count__gte=0),
-                name='count_at_least_zero'
-            )
-        ]
 
 class ReceiveShipment(models.Model):
     id = models.CharField(max_length=12, primary_key=True)
