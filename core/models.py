@@ -110,13 +110,13 @@ class ObjectInContainer(models.Model):
     ship = models.ForeignKey(ShipId, blank=True, null=True, default=None,on_delete=models.CASCADE)
     damaged = models.BooleanField(default=False)
 
-    def transfer_to_tote(self, tote: Tote, count: int):
+    def stow_to_tote(self, tote: Tote, count: int):
         self._transfer_to_new_container(count, tote=tote)
 
-    def transfer_to_container(self, container: Container, count: int):
+    def stow_to_container(self, container: Container, count: int):
         self._transfer_to_new_container(count, container=container)
 
-    def transfer_to_location(self, location: Location, count: int):
+    def stow_to_location(self, location: Location, count: int):
         objects_in_location = ObjectInContainer.objects.filter(location=location)
         
         self._run_location_checks(location, count, objects_in_location)
