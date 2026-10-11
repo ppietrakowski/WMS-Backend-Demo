@@ -128,31 +128,34 @@ class ObjectInContainer(models.Model):
             raise ProductConditionMismatchError()
         
         with transaction.atomic():
-            objects, created = ObjectInContainer.objects.get_or_create(
+            self._try_stow_item_in_location(location, count, objects_in_location)
+
+    def _try_stow_item_in_location(self, location, count, objects_in_location):
+        objects, created = ObjectInContainer.objects.get_or_create(
                             product = self.product,
                             location=location,
                             status=ObjectInContainer.Status.Available,
                             defaults={'count': count}
                         )
                         
-            if not created:
-                if objects.damaged != self.damaged:
-                    raise ProductConditionMismatchError()
-                objects.count += count
-                objects.save()
-            else:
-                already_checked_products = []
-                num_products = 0
-                for i in objects_in_location:
-                    if i.product.id not in already_checked_products:
-                        num_products += 1
-                        already_checked_products.append(i.product.id)
-
-                if num_products == location.code_capacity:
-                    # after this raise, db will revert back to state before 'with' block
-                    raise ReachedCodeCapacityError()
+        if not created:
+            self._try_create_objects_entry(count, objects)
+        else:
+            self._check_has_reached_code_capacity(location, objects_in_location)
                 
-            self._transfer_out_self(count)
+        self._transfer_out_self(count)
+
+    def _try_create_objects_entry(self, count, objects):
+        if objects.damaged != self.damaged:
+            raise ProductConditionMismatchError()
+        objects.count += count
+        objects.save()
+
+    def _check_has_reached_code_capacity(self, location, objects_in_location):
+        num_products = ObjectInContainer.count_unique_products_in_same_location(objects_in_location)
+
+        if num_products == location.code_capacity:
+            raise ReachedCodeCapacityError()
 
     def _transfer_to_new_container(self, count, **find_container_kwargs):
         if count > self.count:
@@ -191,6 +194,17 @@ class ObjectInContainer(models.Model):
             self.save()
         else:
             self.delete()
+
+    @classmethod
+    def count_unique_products_in_same_location(self, location_items):
+        already_checked_products = {}
+        num_products = 0
+        for objects in location_items:
+            if objects.product.id not in already_checked_products:
+                num_products += 1
+                already_checked_products[objects.product.id] = True
+
+        return num_products
 
     class Meta:
         constraints = [
