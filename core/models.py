@@ -121,15 +121,15 @@ class ObjectInContainer(models.Model):
     damaged = models.BooleanField(default=False)
 
     def stow_to_tote(self, tote: Tote, count: int):
-        self._transfer_to_new_container(count, tote=tote)
+        self._stow_to_new_container(count, tote=tote)
 
     def stow_to_container(self, container: Container, count: int):
-        self._transfer_to_new_container(count, container=container)
+        self._stow_to_new_container(count, container=container)
 
     def stow_to_location(self, location: Location, count: int):
         objects_in_location = ObjectInContainer.objects.filter(location=location)
         
-        self._run_location_checks(location, count, objects_in_location)
+        self._run_location_weight_checks(location, count, objects_in_location)
 
         if count > self.count:
             raise RequestedToMoveMoreThanContainError()
@@ -167,7 +167,7 @@ class ObjectInContainer(models.Model):
         if num_products == location.code_capacity:
             raise ReachedCodeCapacityError()
 
-    def _transfer_to_new_container(self, count, **find_container_kwargs):
+    def _stow_to_new_container(self, count, **find_container_kwargs):
         if count > self.count:
             raise RequestedToMoveMoreThanContainError()
         
@@ -186,7 +186,7 @@ class ObjectInContainer(models.Model):
 
             self._transfer_out_self(count)
 
-    def _run_location_checks(self, location, count, objects_in_location):
+    def _run_location_weight_checks(self, location, count, objects_in_location):
         transfered_items_weight = count * self.product.weight
         weights = [i.count * i.product.weight for i in objects_in_location]
         current_products_weight = sum(weights)
