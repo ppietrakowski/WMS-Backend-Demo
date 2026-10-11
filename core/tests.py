@@ -135,10 +135,22 @@ class ObjectInContainerTestCase(TestCase):
         except RequestedToMoveMoreThanContainError:
             pass
 
-    def test_transfer_fail_if_trying_to_stow_damaged_item_in_sellable_location(self):
+    def test_transfer_fail_if_trying_to_stow_sellable_item_in_damage_location(self):
         objects = ObjectInContainer.objects.get(product_id=self._test_product_id)
         location = Location.objects.create(id='lo-4A100B100', max_weight=1000,max_weight_per_product=110, code_capacity=5, stores_damaged_items=True)
 
+        try:
+            objects.transfer_to_location(location, self._startup_container_count)
+            self.fail('Should fail, because stowing sellable item in damage location is illegal')
+        except ProductConditionMismatchError:
+            pass
+
+    def test_transfer_fail_if_trying_to_stow_damaged_item_in_sellable_location(self):
+        objects = ObjectInContainer.objects.get(product_id=self._test_product_id)
+        objects.damaged = True
+        objects.save()
+        location = Location.objects.create(id='lo-4A100B100', max_weight=1000,max_weight_per_product=110, code_capacity=5, stores_damaged_items=False)
+    
         try:
             objects.transfer_to_location(location, self._startup_container_count)
             self.fail('Should fail, because stowing sellable item in damage location is illegal')
@@ -227,4 +239,4 @@ class ContainerItemViewTestCase(APITestCase):
                         })
     
         self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
-              
+     
