@@ -153,7 +153,7 @@ class ObjectInContainerTestCase(TestCase):
     
         try:
             objects.transfer_to_location(location, self._startup_container_count)
-            self.fail('Should fail, because stowing sellable item in damage location is illegal')
+            self.fail('Should fail, because stowing damaged item in sellable location is illegal')
         except ProductConditionMismatchError:
             pass
 
