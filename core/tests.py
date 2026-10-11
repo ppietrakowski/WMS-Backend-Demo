@@ -157,7 +157,7 @@ class ObjectInContainerTestCase(TestCase):
         except ProductConditionMismatchError:
             pass
 
-    def test_transfer_fail_if_trying_to_stow_damaged_item_in_sellable_location(self):
+    def test_transfer_to_location_if_location_has_multiple_shipments(self):
         
         location = Location.objects.create(id='lo-4A100B100', max_weight=1000,max_weight_per_product=110, code_capacity=3, stores_damaged_items=False)
 
