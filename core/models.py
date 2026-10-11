@@ -9,29 +9,29 @@ class ProductCode(models.Model):
     class Meta:
         constraints = [
             models.CheckConstraint(
-                condition=models.Q(weight__gt=0),
-                name='weight_greater_than_zero'    
+                condition = models.Q(weight__gt=0),
+                name = 'weight_greater_than_zero'    
             ),
         ]
 
-    id = models.CharField(max_length=10, null=False, primary_key=True)
-    name = models.CharField(max_length=100)
-    weight = models.IntegerField(default=10)
+    id = models.CharField(max_length = 10, null = False, primary_key = True)
+    name = models.CharField(max_length = 100)
+    weight = models.IntegerField(default = 10)
 
     def __str__(self):
         return f'{self.name}[{self.id}]'
 
 
 class ShipId(models.Model):
-    id = models.CharField(max_length=12, primary_key=True)
+    id = models.CharField(max_length = 12, primary_key = True)
 
 
 class Tote(models.Model):
     class Meta:
         constraints = [
             models.CheckConstraint(
-                condition=models.Q(id__startswith='ts'),
-                name='id_starts_with_ts'    
+                condition = models.Q(id__startswith = 'ts'),
+                name = 'id_starts_with_ts'    
             ),
         ]
 
@@ -45,36 +45,36 @@ class Container(models.Model):
     class Meta:
         constraints = [
             models.CheckConstraint(
-                condition=models.Q(id__startswith='cs'),
-                name='id_starts_with_cs'    
+                condition = models.Q(id__startswith = 'cs'),
+                name = 'id_starts_with_cs'    
             ),
         ]
 
     """
     Starts with cs
     """
-    id = models.CharField(max_length=12, primary_key=True)
+    id = models.CharField(max_length = 12, primary_key = True)
 
 
 class Location(models.Model):
     class Meta:
         constraints = [
             models.CheckConstraint(
-                condition=models.Q(id__startswith='lo'),
-                name='id_starts_with_lo'    
+                condition = models.Q(id__startswith = 'lo'),
+                name = 'id_starts_with_lo'    
             ),
             models.CheckConstraint(
-                condition=models.Q(max_weight__gte=models.F('max_weight_per_product')),
-                name='max_weigth_gte_max_weight_per_product'
+                condition = models.Q(max_weight__gte = models.F('max_weight_per_product')),
+                name = 'max_weigth_gte_max_weight_per_product'
             )
         ]
 
     # starts with lo
-    id = models.CharField(max_length=12, primary_key=True)
-    max_weight = models.IntegerField(validators=[MinValueValidator(1000)])
-    max_weight_per_product = models.IntegerField(validators=[MinValueValidator(1000)])
-    code_capacity = models.IntegerField(default=5)
-    stores_damaged_items = models.BooleanField(default=False)
+    id = models.CharField(max_length = 12, primary_key = True)
+    max_weight = models.IntegerField(validators = [MinValueValidator(1000)])
+    max_weight_per_product = models.IntegerField(validators = [MinValueValidator(1000)])
+    code_capacity = models.IntegerField(default = 5)
+    stores_damaged_items = models.BooleanField(default = False)
 
 
 
@@ -104,30 +104,30 @@ class ObjectInContainer(models.Model):
     class Meta:
         constraints = [
             models.CheckConstraint(
-                condition=models.Q(count__gte=0),
-                name='count_at_least_zero'
+                condition = models.Q(count__gte = 0),
+                name = 'count_at_least_zero'
             )
         ]
         
-    product = models.ForeignKey(ProductCode, on_delete=models.CASCADE)
-    status = models.IntegerField(choices=Status, default=Status.Inbound)
-    count = models.IntegerField(default=1)
+    product = models.ForeignKey(ProductCode, on_delete = models.CASCADE)
+    status = models.IntegerField(choices = Status, default = Status.Inbound)
+    count = models.IntegerField(default = 1)
 
-    tote = models.ForeignKey(Tote, blank=True, null=True, default=None, on_delete=models.CASCADE)
-    location = models.ForeignKey(Location, blank=True, null=True, default=None,on_delete=models.CASCADE)
-    container = models.ForeignKey(Container, blank=True, null=True, default=None,on_delete=models.CASCADE)
+    tote = models.ForeignKey(Tote, blank = True, null = True, default = None, on_delete = models.CASCADE)
+    location = models.ForeignKey(Location, blank = True, null = True, default = None,on_delete = models.CASCADE)
+    container = models.ForeignKey(Container, blank = True, null = True, default = None,on_delete = models.CASCADE)
 
-    ship = models.ForeignKey(ShipId, blank=True, null=True, default=None,on_delete=models.CASCADE)
-    damaged = models.BooleanField(default=False)
+    ship = models.ForeignKey(ShipId, blank = True, null = True, default = None,on_delete = models.CASCADE)
+    damaged = models.BooleanField(default = False)
 
-    def stow_to_tote(self, tote: Tote, count: int):
-        self._stow_to_new_container(count, tote=tote)
+    def stow_to_tote(self, tote: Tote, count: int, status: Status = Status.Inbound):
+        self._stow_to_new_container(status, count, tote = tote)
 
-    def stow_to_container(self, container: Container, count: int):
-        self._stow_to_new_container(count, container=container)
+    def stow_to_container(self, container: Container, count: int, status: Status = Status.Inbound):
+        self._stow_to_new_container(status, count, container = container)
 
     def stow_to_location(self, location: Location, count: int):
-        objects_in_location = ObjectInContainer.objects.filter(location=location)
+        objects_in_location = ObjectInContainer.objects.filter(location = location)
         
         self._run_location_weight_checks(location, count, objects_in_location)
 
@@ -143,9 +143,9 @@ class ObjectInContainer(models.Model):
     def _try_stow_item_in_location(self, location, count, objects_in_location):
         objects, created = ObjectInContainer.objects.get_or_create(
                             product = self.product,
-                            location=location,
-                            status=ObjectInContainer.Status.Available,
-                            defaults={'count': count}
+                            location = location,
+                            status = ObjectInContainer.Status.Available,
+                            defaults = {'count': count}
                         )
                         
         if not created:
@@ -167,7 +167,7 @@ class ObjectInContainer(models.Model):
         if num_products == location.code_capacity:
             raise ReachedCodeCapacityError()
 
-    def _stow_to_new_container(self, count, **find_container_kwargs):
+    def _stow_to_new_container(self, status, count, **find_container_kwargs):
         if count > self.count:
             raise RequestedToMoveMoreThanContainError()
         
@@ -175,7 +175,8 @@ class ObjectInContainer(models.Model):
             objects, created = ObjectInContainer.objects.get_or_create(
                 product = self.product,
                 **find_container_kwargs,
-                defaults={'count': count}
+                status = status,
+                defaults = {'count': count}
             )
 
             if not created:
@@ -220,4 +221,4 @@ class ObjectInContainer(models.Model):
 class ReceiveShipment(models.Model):
     id = models.CharField(max_length=12, primary_key=True)
     # cheat container system to better transfer data between containers
-    container = models.ForeignKey(Container, on_delete=models.CASCADE)
+    container = models.ForeignKey(Container, on_delete = models.CASCADE)
