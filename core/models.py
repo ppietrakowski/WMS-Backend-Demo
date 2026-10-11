@@ -118,6 +118,7 @@ class ObjectInContainer(models.Model):
 
     def transfer_to_location(self, location: Location, count: int):
         objects_in_location = ObjectInContainer.objects.filter(location=location)
+        
         self._run_location_checks(location, count, objects_in_location)
 
         if count > self.count:
@@ -130,6 +131,7 @@ class ObjectInContainer(models.Model):
             objects, created = ObjectInContainer.objects.get_or_create(
                             product = self.product,
                             location=location,
+                            status=ObjectInContainer.Status.Available,
                             defaults={'count': count}
                         )
                         
@@ -139,7 +141,14 @@ class ObjectInContainer(models.Model):
                 objects.count += count
                 objects.save()
             else:
-                if len(objects_in_location) == location.code_capacity:
+                already_checked_products = []
+                num_products = 0
+                for i in objects_in_location:
+                    if i.product.id not in already_checked_products:
+                        num_products += 1
+                        already_checked_products.append(i.product.id)
+
+                if num_products == location.code_capacity:
                     # after this raise, db will revert back to state before 'with' block
                     raise ReachedCodeCapacityError()
                 

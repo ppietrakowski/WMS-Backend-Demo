@@ -11,12 +11,12 @@ class ObjectInContainerTestCase(TestCase):
         self._test_product_id   = 'X000000000'
         self._test_container_id = 'cs0000000000'
 
-        container = Container.objects.create(id=self._test_container_id)
+        self.container = Container.objects.create(id=self._test_container_id)
 
         for i in range(6):
             code = 'X00000000' + str(i)
             p = ProductCode.objects.create(id=code, name='Test product', weight=100)
-            ObjectInContainer.objects.create(container=container, product=p, count=self._startup_container_count)
+            ObjectInContainer.objects.create(container=self.container, product=p, count=self._startup_container_count)
 
 
         Tote.objects.create(id='tsXDD0000000')
@@ -156,6 +156,23 @@ class ObjectInContainerTestCase(TestCase):
             self.fail('Should fail, because stowing damaged item in sellable location is illegal')
         except ProductConditionMismatchError:
             pass
+
+    def test_transfer_fail_if_trying_to_stow_damaged_item_in_sellable_location(self):
+        
+        location = Location.objects.create(id='lo-4A100B100', max_weight=1000,max_weight_per_product=110, code_capacity=3, stores_damaged_items=False)
+
+        ObjectInContainer.objects.create(product_id=self._test_product_id, status=ObjectInContainer.Status.Inbound, location=location, count=3)
+        ObjectInContainer.objects.create(product_id=self._test_product_id, status=ObjectInContainer.Status.Reserved, location=location, count=3)
+        ObjectInContainer.objects.create(product_id=self._test_product_id, status=ObjectInContainer.Status.Available, location=location, count=3)
+
+        try:
+            o = ObjectInContainer.objects.filter(container=self.container, product='X000000005', count=self._startup_container_count).first()
+            o.transfer_to_location(location, 1)
+        except ReachedCodeCapacityError:
+            self.fail('Should add normally, as other items are some, just flagged different (for example for shipping)')
+            
+            
+        
 
 
 class ProductViewTest(APITestCase):
