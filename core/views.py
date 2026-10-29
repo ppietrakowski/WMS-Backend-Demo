@@ -78,3 +78,20 @@ class AddItemToContainerView(APIView):
             objects.save()
 
         return Response('ok', status=status.HTTP_201_CREATED if created else status.HTTP_200_OK)
+
+
+class RemoveItemFromContainer(APIView):
+    def delete(self, request: HttpRequest, container_id: str):
+        if 'product' not in request.data:
+            return Response(status=status.HTTP_403_FORBIDDEN)
+
+        count = 1
+        if 'count' in request.data:
+            count = int(request.data['count'])
+
+        objects = []
+
+        if container_id.startswith('ts'):
+            objects = ObjectInContainer.objects.filter(tote_id=container_id)
+
+        return Response(status=status.HTTP_200_OK)
