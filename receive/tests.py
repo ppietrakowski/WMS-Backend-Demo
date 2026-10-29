@@ -7,20 +7,29 @@ from django.urls import reverse
 # Create your tests here.
 class GetReceiveShipmentProductsTest(APITestCase):
     def setUp(self):
+
+        ship_id = InboundShipmentID.objects.create(id='sz1234567892', date_issued='2026-10-29')
+        p = ProductCode.objects.create(id='X123456789', name='test product')
+        InboundItemInShipment.objects.create(ship_id = ship_id, product = p, available_count=3, total_count=3)
+
         return super().setUp()
 
     def test_fails_when_no_ship_id_passed(self):
-        #self.client.get(reverse(self._product_page, 
-            #kwargs={'product_id': 'X000000000'}))
         response = self.client.post(reverse('get_receive_products'))
 
         self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
-        
+
     def test_fails_when_invalid_ship_id_passed(self):
-        #self.client.get(reverse(self._product_page, 
-            #kwargs={'product_id': 'X000000000'}))
         response = self.client.post(reverse('get_receive_products'), {
             'ship_id': 'sz1234567891'
         })
 
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+
+    def test_returns_valid_collection_of_products_in_shipment(self):
+        response = self.client.post(reverse('get_receive_products'), {
+            'ship_id': 'sz1234567892'
+        })
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+

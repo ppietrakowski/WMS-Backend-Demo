@@ -9,7 +9,7 @@ class InboundShipmentID(models.Model):
 
 
 class InboundItemInShipment(models.Model):
-    ship_id = models.ForeignKey(InboundShipmentID, on_delete=models.CASCADE)
+    ship = models.ForeignKey(InboundShipmentID, on_delete=models.CASCADE)
     product = models.ForeignKey(ProductCode, on_delete=models.CASCADE)
     available_count = models.IntegerField(default=1)
     # should be at start same as available_count
@@ -19,7 +19,7 @@ class InboundItemInShipment(models.Model):
 
 class ReceiveProblemSolveCode(models.Model):
     psr = models.CharField(max_length=12, primary_key=True)
-    ship_id = models.ForeignKey(InboundShipmentID, on_delete=models.CASCADE)
+    ship = models.ForeignKey(InboundShipmentID, on_delete=models.CASCADE)
     by_whom = models.ForeignKey(User, on_delete=models.CASCADE)
 
 
