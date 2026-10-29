@@ -59,13 +59,11 @@ MIDDLEWARE = [
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
 ]
 
-"""
 REST_FRAMEWORK = {
     'DEFAULT_AUTHENTICATION_CLASSES': (
-        'base.authentication.CookieJWTAuthentication',
+        'core.authentication.CookieJWTAuthentication',
     ),
 }
-"""
 
 CORS_ALLOW_CREDENTIALS = True
 CORS_ALLOWED_ORIGINS = [
@@ -159,7 +157,7 @@ SIMPLE_JWT = {
     'AUTH_COOKIE_SECURE': not DEBUG,      # Set to True in production (HTTPS)
     'AUTH_COOKIE_HTTP_ONLY': not DEBUG,    # Prevents JavaScript reading (XSS protection)
     'AUTH_COOKIE_PATH': '/',
-    'AUTH_COOKIE_SAMESITE': 'None' if not DEBUG else 'Lax',    # Protection against CSRF
+    'AUTH_COOKIE_SAMESITE': 'None',    # Protection against CSRF
 }
 
 
