@@ -44,7 +44,8 @@ INSTALLED_APPS = [
     'corsheaders',
     'rest_framework_simplejwt',
     'wms',
-    'core'
+    'core',
+    'receive',
 ]
 
 MIDDLEWARE = [
