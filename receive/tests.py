@@ -10,7 +10,7 @@ class GetReceiveShipmentProductsTest(APITestCase):
 
         ship_id = InboundShipmentID.objects.create(id='sz1234567892', date_issued='2026-10-29')
         p = ProductCode.objects.create(id='X123456789', name='test product')
-        InboundItemInShipment.objects.create(ship_id = ship_id, product = p, available_count=3, total_count=3)
+        InboundItemInShipment.objects.create(ship = ship_id, product = p, available_count=3, total_count=3)
 
         return super().setUp()
 
@@ -32,4 +32,8 @@ class GetReceiveShipmentProductsTest(APITestCase):
         })
 
         self.assertEqual(response.status_code, status.HTTP_200_OK)
+        result = response.json()
+        products = ReceiveItemSerializer(data=result['products'], many=True)
+        self.assertTrue(products.is_valid())
+        self.assertEqual(products.validated_data[0]['code'], 'X123456789')
 
