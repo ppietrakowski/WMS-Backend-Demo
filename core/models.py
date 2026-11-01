@@ -122,3 +122,8 @@ class ProductInContainer(models.Model):
 class ProductCodeMapping(models.Model):
     product = models.ForeignKey(ProductCode, on_delete=models.CASCADE)
     code = models.CharField(max_length=13)
+
+
+class DropzoneTime(models.Model):
+    time = models.DateTimeField()
+    container = models.ForeignKey(StorageUnit, on_delete=models.CASCADE)
