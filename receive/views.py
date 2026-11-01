@@ -6,9 +6,6 @@ from .models import *
 from rest_framework import serializers
 from django.contrib.auth.models import User, Group
 from core.models import *
-
-from django.shortcuts import get_object_or_404
-from functools import reduce
 from rest_framework.permissions import IsAuthenticated
 
 class ReceiveItem:
@@ -75,7 +72,7 @@ class GetToteHasSameModifierAsProduct(APIView):
         damaged = bool(request.data['damaged'])
         tote_id = request.data['tote_id']
 
-        objects = ObjectInContainer.objects.filter(tote_id=tote_id)
+        objects = ProductInContainer.objects.filter(container_id=tote_id)
 
         if not objects.exists():
             return Response(True)

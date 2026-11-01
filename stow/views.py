@@ -25,7 +25,7 @@ class StartStowSession(APIView):
                 StowSessionContainer.objects.get_or_create(defaults={
                     'container_id': i,
                     'user': request.user 
-                })
+                })  
 
             return Response({'stow_containers': len(containers)})
 
@@ -35,7 +35,6 @@ class GetStowSession(APIView):
     permission_classes = [IsAuthenticated]
     def post(self, request: HttpRequest):
         containers =[i.container.id for i in StowSessionContainer.objects.filter(user=request.user)]
-
         return Response({'containers': containers})
 
 
@@ -45,8 +44,8 @@ class GetProductDetails(APIView):
     def post(self, request: HttpRequest):
 
         product, container = request.data['product_code'], request.data['container']
-
-        products = ProductInContainer.objects.filter(container_id=container, product_id=product)
+        product = ProductCodeMapping.objects.get(code=product).product
+        products = ProductInContainer.objects.filter(container_id=container, product=product)
 
         if not products.exists():
             return Response(status=status.HTTP_403_FORBIDDEN)
