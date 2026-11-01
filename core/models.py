@@ -2,6 +2,7 @@ from django.db import models
 from django.core.validators import *
 from django.db.models.functions import Upper
 from django.db import transaction
+from django.contrib.auth.models import User
 
 # Create your models here.
 
@@ -77,6 +78,62 @@ class Location(models.Model):
     stores_damaged_items = models.BooleanField(default = False)
 
 
+class ProductContainer(models.Model):
+    class Meta:
+        constraints = [
+            models.CheckConstraint(
+                condition = models.Q(location__isnull = False) | models.Q(tote__isnull=False) | models.Q(container__isnull=False),
+                name = 'has_assigned_any_container'    
+            ),
+        ]
+
+    location = models.ForeignKey(Location, blank=True, null=True, on_delete=models.CASCADE)
+    tote = models.ForeignKey(Tote, blank=True, null=True,on_delete=models.CASCADE)
+    container = models.ForeignKey(Container, blank=True, null=True,on_delete=models.CASCADE)
+
+    def __str__(self):
+        if self.location:
+            return str(self.location)
+
+        if self.tote:
+            return str(self.tote)
+
+        return str(self.container)
+
+    def get_max_weight(self):
+
+        if self.tote:
+            return 10000
+
+        return self.location.max_weight if self.location else -1 
+
+    def max_weight_per_product(self):
+        return self.location.max_weight_per_product if self.location else -1 
+
+    def get_code_capacity(self):
+        return self.location.code_capacity if self.location else -1
+
+    def is_storing_damaged_items(self):
+        return self.location.stores_damaged_items if self.location else True
+
+    def is_stowable(self):
+        return self.location or self.tote
+
+
+def get_product_container(id: str) -> ProductContainer:
+    results = []
+    if id.startswith('ts'):
+        results = ProductContainer.objects.filter(tote_id=id)
+    elif id.startswith('lo'):
+        results = ProductContainer.objects.filter(location_id=id)
+    else:
+        results = ProductContainer.objects.filter(container_id=id)
+
+    if results.exists():
+        return results.first()
+
+    raise ProductContainer.DoesNotExist()
+
 
 class ProductConditionMismatchError(Exception):
     pass
@@ -119,6 +176,14 @@ class ObjectInContainer(models.Model):
 
     ship = models.ForeignKey(ShipId, blank = True, null = True, default = None,on_delete = models.CASCADE)
     damaged = models.BooleanField(default = False)
+
+    def stow(self, container_id: str, count: int, new_status: Status):
+        if container_id.startswith('lo'):
+            self.stow_to_location(container_id, count)
+        elif container_id.startswith('ts'):
+            self.stow_to_tote(Tote.objects.get(id=container_id), count, new_status)
+        elif container_id.startswith('cs'):
+            self.stow_to_container(Container.objects.get(id=container_id), count, new_status)
 
     def stow_to_tote(self, tote: Tote, count: int, status: Status = Status.Inbound):
         self._stow_to_new_container(status, count, tote = tote)
@@ -222,3 +287,84 @@ class ReceiveShipment(models.Model):
     id = models.CharField(max_length=12, primary_key=True)
     # cheat container system to better transfer data between containers
     container = models.ForeignKey(Container, on_delete = models.CASCADE)
+
+
+class StorageUnit(models.Model):
+    id = models.CharField(max_length=12, primary_key=True)
+
+    max_weight = models.IntegerField(default=0)
+    max_weight_per_product = models.IntegerField(default=0)
+    code_capacity = models.IntegerField(default = 0)
+    stores_damaged_items = models.BooleanField(default = False)
+    blocked = models.BooleanField(default=False)
+    dropzone = models.CharField(max_length=12, default='')
+
+    def can_stow_items(self, is_product_damaged: bool):
+        return is_product_damaged != self.stores_damaged_items
+
+    def has_reached_sku_limit(self):
+        current_items_count = self.items.count()
+        return (current_items_count >= self.code_capacity) if self.code_capacity > 0 else False
+
+    def can_store_product_weight(self, product_weight: int):
+        if self.max_weight_per_product > 0:
+            if product_weight > self.max_weight_per_product:
+                return False
+
+        return True
+
+    def can_store_weight(self, weight):
+        if not self.can_store_product_weight(weight):
+            return False
+         
+        current_weight = 0
+        for i in self.items.all():
+            current_weight += i.product.weight * i.count
+
+        return (weight + current_weight) <= self.max_weight if self.max_weight > 0 else True
+    
+
+class ProductInContainer(models.Model):
+    class Status(models.IntegerChoices):
+        Inbound = 0
+        Available = 1
+        # SHIP_ID must be valid then
+        Reserved = 2
+        Shipped = 3
+    
+    container = models.ForeignKey(StorageUnit, on_delete=models.CASCADE, related_name='items')
+    product = models.ForeignKey(ProductCode, on_delete=models.CASCADE)
+    count = models.IntegerField(default=1)
+    damaged = models.BooleanField(default=False)
+    status = models.IntegerField(choices=Status, default=Status.Inbound)
+    shipment = models.ForeignKey(ShipId, blank = True, null = True, default = None,on_delete = models.CASCADE)
+
+    def move_to_container(self, to: StorageUnit, count: int):
+        if self.count < count:
+            raise RequestedToMoveMoreThanContainError()
+       
+        if to.has_reached_sku_limit():
+            raise ReachedCodeCapacityError()
+
+        if to.can_store_product_weight(count * self.product.weight):
+            raise ProductTooHeavyToLocationError()
+    
+        if not to.can_store_weight(count * self.product.weight):
+            raise WeightLimitReachedError()
+    
+        with transaction.atomic():
+            self._try_move_to_location(to, count)
+
+    def _try_move_to_location(self, to: StorageUnit, count: int):
+        try:
+            p = ProductContainer.objects.get(container=to,product=self.product)
+            p.count += count
+            p.save()
+        except ProductInContainer.DoesNotExist:
+            ProductInContainer.objects.create(product_id=self.product, count=count, status=self.status, damaged=self.damaged, container_id=to)
+        
+        self.count -= count
+        if self.count <= 0:
+            self.delete()
+        else:
+            self.save()

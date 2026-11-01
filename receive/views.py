@@ -5,21 +5,11 @@ from rest_framework.serializers import ModelSerializer
 from .models import *
 from rest_framework import serializers
 from django.contrib.auth.models import User, Group
+from core.models import *
 
 from django.shortcuts import get_object_or_404
-
-from rest_framework import status
-from rest_framework.views import APIView
-from rest_framework.response import Response
-from rest_framework_simplejwt.views import TokenObtainPairView, TokenRefreshView
-from rest_framework_simplejwt.authentication import JWTAuthentication
-from rest_framework_simplejwt.exceptions import InvalidToken, TokenError
-from wms import settings
-from django.http import HttpRequest
+from functools import reduce
 from rest_framework.permissions import IsAuthenticated
-from rest_framework_simplejwt.serializers import TokenObtainPairSerializer
-from .models import *
-from rest_framework import serializers
 
 class ReceiveItem:
     code = ''
@@ -52,15 +42,15 @@ class GetReceiveShipmentProducts(APIView):
             ship_id = request.data['ship_id']
             InboundShipmentID.objects.get(id=ship_id)
 
-            products = InboundItemInShipment.objects.filter(ship_id=ship_id)
+            products = ProductInContainer.objects.filter(container_id=ship_id)
 
             p = []
             for i in products:
-                p.append(ReceiveItem(i.product.id, i.available_count, i.total_count, i.damaged))
+                p.append(ReceiveItem(i.product.id, i.count, i.count, i.damaged))
 
             if not products.exists():
                 return Response({'message': 'Empty shipment id', 
-                                             'type': 'error'}, status.HTTP_404_BAD_REQUEST) 
+                                             'type': 'error'}, status.HTTP_400_BAD_REQUEST) 
 
             s = ReceiveItemSerializer(p, many=True)
 
@@ -72,101 +62,32 @@ class GetReceiveShipmentProducts(APIView):
                              'type': 'error'}, status.HTTP_400_BAD_REQUEST) 
 
 
-class CookieTokenObtainPairView(TokenObtainPairView):
-    def post(self, request, *args, **kwargs):
-        serializer = self.get_serializer(data=request.data)
-        serializer.is_valid(raise_exception=True)
+class GetToteHasSameModifierAsProduct(APIView):
+    # to prevent caching by browser
+    def post(self, request: HttpRequest):
+        if 'damaged' not in request.data:
+            return Response({'message': 'Invalid request', 
+                                         'type': 'error'}, status.HTTP_400_BAD_REQUEST)   
+        if 'tote_id' not in request.data:
+            return Response({'message': 'Invalid request', 
+                                                 'type': 'error'}, status.HTTP_400_BAD_REQUEST)   
 
-        access_token = serializer.validated_data.get('access')
-        refresh_token = serializer.validated_data.get('refresh')
+        damaged = bool(request.data['damaged'])
+        tote_id = request.data['tote_id']
 
-        response = Response({'message': 'Login successful'}, status=status.HTTP_200_OK)
+        objects = ObjectInContainer.objects.filter(tote_id=tote_id)
 
-        # CRITICAL: Attach cookies to response
-        response.set_cookie(
-            key=settings.SIMPLE_JWT['AUTH_COOKIE_ACCESS'],
-            value=access_token,
-            httponly=settings.SIMPLE_JWT['AUTH_COOKIE_HTTP_ONLY'],
-            samesite=settings.SIMPLE_JWT['AUTH_COOKIE_SAMESITE'],
-            secure=settings.SIMPLE_JWT['AUTH_COOKIE_SECURE'],
-            path='/',
-        )
-        response.set_cookie(
-            key=settings.SIMPLE_JWT['AUTH_COOKIE_REFRESH'],
-            value=refresh_token,
-            httponly=settings.SIMPLE_JWT['AUTH_COOKIE_HTTP_ONLY'],
-            samesite=settings.SIMPLE_JWT['AUTH_COOKIE_SAMESITE'],
-            secure=settings.SIMPLE_JWT['AUTH_COOKIE_SECURE'],
-            path='/',
-        )
-        return response
+        if not objects.exists():
+            return Response(True)
+
+        container_damage = objects.first().damaged
+        return Response(container_damage == damaged)
 
 
-class CookieTokenRefreshView(TokenRefreshView):
-    def post(self, request: HttpRequest, *args, **kwargs):
-        # get last known refresh_token
-        refresh_token = request.COOKIES.get(settings.SIMPLE_JWT['AUTH_COOKIE_REFRESH'])
-
-        # Assign it to request.data so SimpleJWT's serializer can validate it
-        if refresh_token:
-            request.data['refresh'] = refresh_token
-
-        serializer = self.get_serializer(data=request.data)
-        response_data = self.validate_refresh_request(serializer)
-        
-        # Extract new refresh token
-        new_refresh = response_data.pop('refresh', None)
-
-        response = Response(response_data, status=status.HTTP_200_OK)
-
-        # Update the HttpOnly cookie with rotated refresh token if applicable
-        if new_refresh:
-            response.set_cookie(
-                key=settings.SIMPLE_JWT['AUTH_COOKIE_REFRESH'],
-                value=new_refresh,
-                httponly=settings.SIMPLE_JWT['AUTH_COOKIE_HTTP_ONLY'],
-                samesite=settings.SIMPLE_JWT['AUTH_COOKIE_SAMESITE'],
-                secure=settings.SIMPLE_JWT['AUTH_COOKIE_SECURE'],  # Set to True in production (HTTPS)
-                path='/',
-            )
-
-        return response
-
-    def validate_refresh_request(self, serializer):
-        try:
-            serializer.is_valid(raise_exception=True)
-            return serializer.validated_data
-        except TokenError as e:
-            raise InvalidToken(e.args[0])
-
-
-class CookieLogoutView(APIView):
-    def post(self, request):
-        response = Response({'message': 'Logged out'}, status=status.HTTP_200_OK)
-        # logout is just removing cookies with token
-        response.delete_cookie(settings.SIMPLE_JWT['AUTH_COOKIE_ACCESS'])
-        response.delete_cookie(settings.SIMPLE_JWT['AUTH_COOKIE_REFRESH'])
-        return response
-
-
-def get_user_roles(user: User):
-    if user.is_superuser:
-        return [str(i) for i in Group.objects.all()]
-    
-    return [str(i) for i in user.groups.all()]
-
-
-class CurrentUserView(APIView):
+class ReceiveProblemSolveRaise(APIView):
     permission_classes = [IsAuthenticated]
+    def put(self, request):
+        psr, ship, reason = request.data['psr_id'], request.data['ship_id'], int(request.data['reason'])
 
-    def get(self, request: HttpRequest):
-        user = request.user
-        roles = get_user_roles(user)
-
-        return Response({
-            'id': user.id,
-            'username': user.username,
-            'email': user.email,
-            'is_staff': user.is_staff,
-            'roles': roles
-        })
+        ReceiveProblemSolveCode.objects.create(psr=psr,ship_id=ship,by_whom=request.user,reason=reason)
+        return Response(status=status.HTTP_201_CREATED)

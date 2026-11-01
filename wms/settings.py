@@ -46,6 +46,7 @@ INSTALLED_APPS = [
     'wms',
     'core',
     'receive',
+    'stow',
 ]
 
 MIDDLEWARE = [
@@ -72,6 +73,7 @@ CORS_ALLOWED_ORIGINS = [
     "https://localhost:5173",  # Common Vite default
     "https://127.0.0.1:5173",
     "https://ppietrakowski.github.io",
+    "https://abrasion-unbent-leotard.ngrok-free.dev"
 ]
 
 CORS_ALLOWED_ORIGIN_REGEXES = [
@@ -154,7 +156,7 @@ SIMPLE_JWT = {
     # Cookie Configuration
     'AUTH_COOKIE_ACCESS': 'access_token',
     'AUTH_COOKIE_REFRESH': 'refresh_token',
-    'AUTH_COOKIE_SECURE': not DEBUG,      # Set to True in production (HTTPS)
+    'AUTH_COOKIE_SECURE': True,      # Set to True in production (HTTPS)
     'AUTH_COOKIE_HTTP_ONLY': not DEBUG,    # Prevents JavaScript reading (XSS protection)
     'AUTH_COOKIE_PATH': '/',
     'AUTH_COOKIE_SAMESITE': 'None',    # Protection against CSRF
