@@ -190,9 +190,14 @@ class MoveProductToNewContainer(APIView):
 
 class MoveDropzone(APIView):
     def post(self, request):
-        container, dropzone = request.data['container'], request.data['dropzone']
+        containers, dropzone = request.data['containers'], request.data['dropzone']
 
-        c = StorageUnit.objects.get(pk=container)
-        c.dropzone = dropzone
-        c.save()
+        for container in containers:
+            c = StorageUnit.objects.filter(pk=container)
+
+            if c.exists():
+                c = c.first()
+                c.dropzone = Dropzone.objects.get(pk=dropzone)
+                c.save()
+        
         return Response(status=status.HTTP_200_OK)
