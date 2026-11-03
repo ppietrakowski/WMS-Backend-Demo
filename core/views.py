@@ -137,22 +137,22 @@ class MoveProductToNewContainer(APIView):
         pr = ProductCode.objects.filter(id=product)
 
         if not pr.exists():
-            return Response(status=status.HTTP_403_FORBIDDEN)
+            return Response({'reason': 'product-not-available'}, status=status.HTTP_403_FORBIDDEN)
         
         count = int(request.data['count'])
 
         source_container_objects = self.get_container_items(container=source_container, product=product)
 
         if source_container_objects.count < count:
-            return Response(status=status.HTTP_403_FORBIDDEN)
+            return Response({'reason': 'count-more-than-available'},status=status.HTTP_403_FORBIDDEN)
 
         dest_container = StorageUnit.objects.get(pk=destination_container_id)
         
         if dest_container.has_reached_sku_limit():
-            return Response(status=status.HTTP_403_FORBIDDEN)
+            return Response({'reason': 'reach-sku-limit'},status=status.HTTP_403_FORBIDDEN)
 
         if not dest_container.can_store_weight(count * pr.first().weight):
-            return Response(status=status.HTTP_403_FORBIDDEN)
+            return Response({'reason': 'weight-limit-reached'},status=status.HTTP_403_FORBIDDEN)
 
         try:
             p = self.get_container_items(container=destination_container_id, product=product)
