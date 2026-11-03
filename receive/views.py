@@ -88,3 +88,14 @@ class ReceiveProblemSolveRaise(APIView):
 
         ReceiveProblemSolveCode.objects.create(psr=psr,ship_id=ship,by_whom=request.user,reason=reason)
         return Response(status=status.HTTP_201_CREATED)
+
+class GetProductByCode(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request, product_id):
+        p = ProductCodeMapping.objects.get(code=product_id).product
+        return Response({'product': {
+            'id': p.id,
+            'name': p.name,
+            'weight': p.weight,
+        }})
