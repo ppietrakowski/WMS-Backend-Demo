@@ -7,4 +7,5 @@ urlpatterns = [
     path('stow-get-product/', GetProductDetails.as_view(), name='stow-get-product'),
     path('stow-move-containers/', MoveStowContainers.as_view(), name='stow-move-containers'),
     path('stow-item/', StowItem.as_view(), name='stow-item'),
+    path('end-stow-session/', EndStowSession.as_view(), name='end-stow-session'),
 ]

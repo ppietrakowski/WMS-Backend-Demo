@@ -125,3 +125,13 @@ class StowItem(APIView):
         
     def get_container_items(self, container: str, product: str):
         return ProductInContainer.objects.get(product_id=product, container_id=container)
+
+
+class EndStowSession(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        objs = StowSessionContainer.objects.filter(user=request.user).select_for_update()
+        objs.delete()
+
+        return Response(status=status.HTTP_200_OK)
