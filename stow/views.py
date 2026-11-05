@@ -131,7 +131,29 @@ class EndStowSession(APIView):
     permission_classes = [IsAuthenticated]
 
     def post(self, request):
-        objs = StowSessionContainer.objects.filter(user=request.user).select_for_update()
-        objs.delete()
+        with transaction.atomic():
+            objs = StowSessionContainer.objects.filter(user=request.user)
+
+            for o in objs:
+                products = ProductInContainer.objects.filter(container = o.container)
+                print(len(products))
+                location = StorageUnit.objects.get(pk='LOCAMNESTYDE')
+
+                if products.first().damaged:
+                    location = StorageUnit.objects.get('LOCAMNESTYUN')
+
+                for p in products:
+                    loc = location.items.all().filter(product=p.product)
+
+                    print(loc.exists())
+                    if loc.exists():
+                        loc.count += p.count
+                        p.delete()
+                        loc.save()
+                    else:
+                        p.container = location
+                        p.save()
+
+            objs.delete()
 
         return Response(status=status.HTTP_200_OK)
