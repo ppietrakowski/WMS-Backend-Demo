@@ -7,5 +7,6 @@ urlpatterns = [
     path('token/refresh/', CookieTokenRefreshView.as_view(), name='token_refresh_view'),
     path('logout/', CookieLogoutView.as_view(), name='logout'),
     path('authuser/', CurrentUserView.as_view(), name='authuser'),
-    path('move-dropzone', MoveDropzone.as_view(), name='move_dropzone')
+    path('move-dropzone/', MoveDropzone.as_view(), name='move_dropzone'),
+    path('add-items-container/', AddItemsContainer.as_view(), name='add-items-container'),
 ]

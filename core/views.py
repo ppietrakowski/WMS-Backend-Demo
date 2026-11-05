@@ -201,3 +201,24 @@ class MoveDropzone(APIView):
                 c.save()
         
         return Response(status=status.HTTP_200_OK)
+
+
+class AddItemsContainer(APIView):
+    def put(self, request):
+        container, products = request.data['container'], request.data['products']
+
+        c, created = StorageUnit.objects.get_or_create(id=container)
+
+        print(products)
+        for p in products:
+            pr = ProductInContainer.objects.filter(product_id = p['product'], container=c)
+
+            if pr.exists():
+                pr.first().count += p['count']
+                pr.first().save()
+            else:
+                ProductInContainer.objects.create(container=c, product=ProductCode.objects.get(pk=p['product']), count=p['count'])
+
+
+
+        return Response(status=status.HTTP_200_OK)
