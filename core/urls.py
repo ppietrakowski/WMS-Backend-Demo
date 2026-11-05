@@ -9,4 +9,5 @@ urlpatterns = [
     path('authuser/', CurrentUserView.as_view(), name='authuser'),
     path('move-dropzone/', MoveDropzone.as_view(), name='move_dropzone'),
     path('add-items-container/', AddItemsContainer.as_view(), name='add-items-container'),
+    path('get-container-products/', ContainerProducts.as_view(), name='get_receive_products'),
 ]

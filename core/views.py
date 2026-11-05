@@ -20,6 +20,25 @@ from .models import *
 from rest_framework import serializers
 from django.contrib.auth.models import User, Group
 
+class ReceiveItem:
+    id = ''
+    name = ''
+    count = 1
+    damaged = False
+
+    def __init__(self, id, name, current_count, damaged):
+        self.id = id
+        self.name = name
+        self.count = current_count
+        self.damaged = damaged
+
+
+class ReceiveItemSerializer(serializers.Serializer):
+    id = serializers.CharField(max_length=12, min_length=10)
+    name = serializers.CharField(max_length=64, min_length=10)
+    count = serializers.IntegerField(min_value=1)
+    damaged = serializers.BooleanField()
+
 class CookieTokenObtainPairView(TokenObtainPairView):
     def post(self, request, *args, **kwargs):
         serializer = self.get_serializer(data=request.data)
@@ -222,3 +241,27 @@ class AddItemsContainer(APIView):
 
 
         return Response(status=status.HTTP_200_OK)
+
+
+class ContainerProducts(APIView):
+    def post(self, request: HttpRequest):
+        if 'container' not in request.data:
+            return Response({'message': 'Provide container', 
+                             'type': 'error'}, status.HTTP_404_NOT_FOUND) 
+
+        container = request.data['container']
+        products = ProductInContainer.objects.filter(container_id=container)
+
+        
+        if not products.exists():
+            return Response({'products': []}) 
+
+        p = []
+        total_count = 0
+        for i in products:
+            total_count += i.count
+            p.append(ReceiveItem(i.product.id, i.product.name, i.count, i.damaged))
+
+        s = ReceiveItemSerializer(p, many=True)
+        return Response({'products': s.data, 'total_count': total_count})
+
