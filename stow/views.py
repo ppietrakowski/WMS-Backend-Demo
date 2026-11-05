@@ -12,7 +12,7 @@ from django.shortcuts import get_object_or_404
 from functools import reduce
 from rest_framework.permissions import IsAuthenticated
 from .models import *
-
+from django.db.models import Sum
 # Create your views here.
 
 class StartStowSession(APIView):
@@ -132,10 +132,20 @@ class EndStowSession(APIView):
 
     def post(self, request):
         with transaction.atomic():
+            count_missing = 0
             objs = StowSessionContainer.objects.filter(user=request.user)
 
             for o in objs:
                 products = ProductInContainer.objects.filter(container = o.container)
+
+                if not products.exists():
+                    continue
+
+                count_missing = products.aggregate(count=Sum("count", outputField=models.IntegerField(), default=0))['count']
+
+                if count_missing >= 4:
+                    return Response({'reason': 'Too many products not stowed'}, status=status.HTTP_400_BAD_REQUEST)
+
                 print(len(products))
                 location = StorageUnit.objects.get(pk='LOCAMNESTYDE')
 
