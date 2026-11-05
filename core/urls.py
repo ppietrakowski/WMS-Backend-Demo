@@ -10,4 +10,5 @@ urlpatterns = [
     path('move-dropzone/', MoveDropzone.as_view(), name='move_dropzone'),
     path('add-items-container/', AddItemsContainer.as_view(), name='add-items-container'),
     path('get-container-products/', ContainerProducts.as_view(), name='get_receive_products'),
+    path('create-product/', CreateProduct.as_view(), name='create-product'),
 ]

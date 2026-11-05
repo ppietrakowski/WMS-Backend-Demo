@@ -265,3 +265,28 @@ class ContainerProducts(APIView):
         s = ReceiveItemSerializer(p, many=True)
         return Response({'products': s.data, 'total_count': total_count})
 
+
+class CreateProduct(APIView):
+    def post(self, request: HttpRequest):
+        name = request.data['name']
+        weight = request.data['weight']
+        code, base_code = request.data['id']['code'], request.data['id']['baseCode']
+
+        o, c = ProductCode.objects.get_or_create(id=base_code, defaults={
+            'id': base_code,
+            'name': name,
+            'weight': weight
+        })
+
+        ProductCodeMapping.objects.get_or_create(product=o, code=base_code, defaults={
+            'product': o,
+            'code': base_code
+        })
+
+        ProductCodeMapping.objects.get_or_create(product=o, code=code, defaults={
+                    'product': o,
+                    'code': code
+                })
+        
+        return Response(status=status.HTTP_200_OK)
+

@@ -98,9 +98,7 @@ class StowItem(APIView):
 
         dest_container = StorageUnit.objects.get(pk=destination_container_id)
         
-        if dest_container.has_reached_sku_limit():
-            return Response({'reason': 'reach-sku-limit'},status=status.HTTP_403_FORBIDDEN)
-
+  
         if not dest_container.can_store_weight(count * pr.first().weight):
             return Response({'reason': 'weight-limit-reached'},status=status.HTTP_403_FORBIDDEN)
 
@@ -113,6 +111,9 @@ class StowItem(APIView):
             p.count += count
             p.save()
         except ProductInContainer.DoesNotExist:
+            if dest_container.has_reached_sku_limit():
+                return Response({'reason': 'reach-sku-limit'},status=status.HTTP_403_FORBIDDEN)
+            
             ProductInContainer.objects.create(product_id=product, count=count, damaged=source_container_objects.damaged, container_id=destination_container_id)
 
         source_container_objects.count -= count
@@ -141,7 +142,7 @@ class EndStowSession(APIView):
                 if not products.exists():
                     continue
 
-                count_missing = products.aggregate(count=Sum("count", outputField=models.IntegerField(), default=0))['count']
+                count_missing = products.aggregate(count=   Sum("count", outputField=models.IntegerField(), default=0))['count']
 
                 if count_missing >= 4:
                     return Response({'reason': 'Too many products not stowed'}, status=status.HTTP_400_BAD_REQUEST)
