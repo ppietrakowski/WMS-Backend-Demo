@@ -55,7 +55,8 @@ class GetProductDetails(APIView):
             'id': p.id,
             'name': p.name,
             'weight': p.weight,
-            'damaged': products.first().damaged
+            'damaged': products.first().damaged,
+            'count': products.first().count
         }})
 
 
@@ -97,12 +98,11 @@ class StowItem(APIView):
             return Response({'reason': 'count-more-than-available'},status=status.HTTP_403_FORBIDDEN)
 
         dest_container = StorageUnit.objects.get(pk=destination_container_id)
-        
   
         if not dest_container.can_store_weight(count * pr.first().weight):
             return Response({'reason': 'weight-limit-reached'},status=status.HTTP_403_FORBIDDEN)
 
-        if source_container_objects.damaged != dest_container.stores_damaged_items:
+        if not dest_container.dropzone and source_container_objects.damaged != dest_container.stores_damaged_items:
             return Response({'reason': 'mismatch-damage-location'},status=status.HTTP_403_FORBIDDEN)
 
 
