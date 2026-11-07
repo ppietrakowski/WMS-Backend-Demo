@@ -151,7 +151,7 @@ class EndStowSession(APIView):
                 location = StorageUnit.objects.get(pk='LOCAMNESTYDE')
 
                 if products.first().damaged:
-                    location = StorageUnit.objects.get('LOCAMNESTYUN')
+                    location = StorageUnit.objects.get(pk='LOCAMNESTYUN')
 
                 for p in products:
                     loc = location.items.all().filter(product=p.product)
