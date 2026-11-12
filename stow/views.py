@@ -38,7 +38,7 @@ class GetStowSession(APIView):
         return Response({'containers': containers})
 
 
-class GetProductDetails(APIView):
+class ValidateProductInContainer(APIView):
     permission_classes = [IsAuthenticated]
 
     def post(self, request: HttpRequest):
