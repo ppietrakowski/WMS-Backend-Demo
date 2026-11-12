@@ -73,48 +73,65 @@ class MoveStowContainers(APIView):
 
         return Response()
 
+class StowError(Exception):
+    def __init__(self, reason):
+        self.reason = reason
+
 
 class StowItem(APIView):
     permission_classes = [IsAuthenticated]
 
     def post(self, request):
         
-        with transaction.atomic():
-            return self._stow_item(request)
+        try:
+            with transaction.atomic():
+                return self._stow_item(request)
+        except StowError as e:
+            return Response({'reason': e.reason}, status = status.HTTP_403_FORBIDDEN)
         
 
     def _stow_item(self, request):
-        source_container, product, destination_container_id = request.data['container'], request.data['item'], request.data['target_bin']
-        pr = ProductCode.objects.filter(id=product)
+        source_container, destination_container_id = request.data['container'], request.data['target_bin']
+
+        products = request.data['products']
+        
+        for p in products:
+            self._stow_product(source_container, destination_container_id, p)
+
+        return Response(status=status.HTTP_200_OK)
+
+
+    def _stow_product(self, source_container, destination_container_id, product):
+        pr = ProductCode.objects.filter(id=product['id'])
+        id = product['id']
 
         if not pr.exists():
-            return Response({'reason': 'product-not-available'}, status=status.HTTP_403_FORBIDDEN)
+            raise StowError(reason='product-not-available')
         
-        count = int(request.data['count'])
+        count = int(product['count'])
 
-        source_container_objects = self.get_container_items(container=source_container, product=product)
+        source_container_objects = self.get_container_items(container=source_container, product=id)
 
         if source_container_objects.count < count:
-            return Response({'reason': 'count-more-than-available'},status=status.HTTP_403_FORBIDDEN)
+            raise StowError(reason='count-more-than-available')
 
         dest_container = StorageUnit.objects.get(pk=destination_container_id)
   
         if not dest_container.can_store_weight(count * pr.first().weight):
-            return Response({'reason': 'weight-limit-reached'},status=status.HTTP_403_FORBIDDEN)
+            raise StowError(reason='weight-limit-reached')
 
         if not dest_container.dropzone and source_container_objects.damaged != dest_container.stores_damaged_items:
-            return Response({'reason': 'mismatch-damage-location'},status=status.HTTP_403_FORBIDDEN)
-
+            raise StowError(reason='mismatch-damage-location')
 
         try:
-            p = self.get_container_items(container=destination_container_id, product=product)
+            p = self.get_container_items(container=destination_container_id, product=id)
             p.count += count
             p.save()
         except ProductInContainer.DoesNotExist:
             if dest_container.has_reached_sku_limit():
-                return Response({'reason': 'reach-sku-limit'},status=status.HTTP_403_FORBIDDEN)
+                raise StowError(reason='reach-sku-limit')
             
-            ProductInContainer.objects.create(product_id=product, count=count, damaged=source_container_objects.damaged, container_id=destination_container_id)
+            ProductInContainer.objects.create(product_id=id, count=count, damaged=source_container_objects.damaged, container_id=destination_container_id)
 
         source_container_objects.count -= count
         if source_container_objects.count <= 0:

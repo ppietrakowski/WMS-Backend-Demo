@@ -80,3 +80,21 @@ class MoveEndpointTestCase(APITestCase):
                             'count': 3,
                         })
         self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+
+
+class MoveDropzoneTestCase(APITestCase):
+    def setUp(self):
+        container = StorageUnit.objects.create(id='tsTest000000')
+        self.containers = [container.id]
+        self.valid_dropzone = Dropzone.objects.create(id='dz-P1-Trans1')
+
+    def test_fails_when_dropzone_does_not_exist(self):
+        try:
+            response = self.client.post(reverse('move-dropzone'), data = {
+                'containers': self.containers,
+                'dropzone': 'dz-P1-Trans2'
+            })
+
+            self.assertNotEqual(response.status_code, status.HTTP_200_OK)
+        except Dropzone.DoesNotExist:
+            self.fail('Should not raise internal server error')
