@@ -19,7 +19,9 @@ from rest_framework_simplejwt.serializers import TokenObtainPairSerializer
 from .models import *
 from rest_framework import serializers
 from django.contrib.auth.models import User, Group
-
+from rest_framework import serializers
+from .models import *
+from django.db.models import Sum
 class ReceiveItem:
     id = ''
     name = ''
@@ -158,25 +160,46 @@ class MoveDropzone(APIView):
         
         return Response(status=status.HTTP_200_OK)
 
+# Structure just to validate for exisiting properties of add-items-container endpoint
+class AddItemContainerSerializer(serializers.Serializer):
+    class Child(serializers.Serializer):
+        product = serializers.CharField(max_length=13, min_length=10)
+        count = serializers.IntegerField()
+        damaged = serializers.BooleanField(default=False, required=False, allow_null=True)
+
+    products = Child(many=True, required=False, allow_empty=True, default=list)         
+    container = serializers.CharField(min_length=10, max_length=12)
+
 
 class AddItemsContainer(APIView):
     def put(self, request):
-        container, products = request.data['container'], request.data['products']
 
-        c, created = StorageUnit.objects.get_or_create(id=container)
+        serializer = AddItemContainerSerializer(data=request.data)
 
+        if not serializer.is_valid():
+            return Response({'reason': 'invalid-product-code'}, status=status.HTTP_403_FORBIDDEN)
+
+        container_id, products = serializer.validated_data['container'], serializer.validated_data['products']
+        container, created = StorageUnit.objects.get_or_create(id=container_id)
+        
         for p in products:
-            pr = ProductInContainer.objects.filter(product_id = p['product'], container=c)
 
-            if pr.exists():
-                pr.first().count += p['count']
-                pr.first().save()
-            else:
-                ProductInContainer.objects.create(container=c, product=ProductCode.objects.get(pk=p['product']), count=p['count'])
+            code = ProductCode.objects.filter(pk=p['product'])
+            if not code.exists():
+                return Response({'reason': 'invalid-product-code'}, status=status.HTTP_403_FORBIDDEN)
 
+            prod, created = container.items.get_or_create(product = code.first(), defaults = {
+                'count': p['count']
+            })
 
+            if not created:
+                prod.count += p['count']
 
-        return Response(status=status.HTTP_200_OK)
+            prod.save()
+
+        prod = container.items
+        o = prod.aggregate(count = Sum("count", outputField=models.IntegerField(), default=0))
+        return Response({'num_container_objects': o['count']}, status=status.HTTP_200_OK)
 
 
 class ContainerProducts(APIView):
