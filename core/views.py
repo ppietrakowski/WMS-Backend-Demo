@@ -139,84 +139,21 @@ class CurrentUserView(APIView):
         })
 
 
-class MoveProductToNewContainer(APIView):
-    permission_classes = []
-    def post(self, request: HttpRequest):
-        if not self.has_required_properties(request):
-            return Response({'message': 'Provide valid properties', 'type': 'error'}, status.HTTP_400_BAD_REQUEST)
-
-        with transaction.atomic():
-            return self._stow_item(request)
-        
-
-    def _stow_item(self, request):
-        source_container = request.data['source_container']
-        destination_container_id = request.data['destination_container']
-        product = request.data['product']
-        pr = ProductCode.objects.filter(id=product)
-
-        if not pr.exists():
-            return Response({'reason': 'product-not-available'}, status=status.HTTP_403_FORBIDDEN)
-        
-        count = int(request.data['count'])
-
-        source_container_objects = self.get_container_items(container=source_container, product=product)
-
-        if source_container_objects.count < count:
-            return Response({'reason': 'count-more-than-available'},status=status.HTTP_403_FORBIDDEN)
-
-        dest_container = StorageUnit.objects.get(pk=destination_container_id)
-        
-        if dest_container.has_reached_sku_limit():
-            return Response({'reason': 'reach-sku-limit'},status=status.HTTP_403_FORBIDDEN)
-
-        if not dest_container.can_store_weight(count * pr.first().weight):
-            return Response({'reason': 'weight-limit-reached'},status=status.HTTP_403_FORBIDDEN)
-
-        try:
-            p = self.get_container_items(container=destination_container_id, product=product)
-            p.count += count
-            p.save()
-        except ProductInContainer.DoesNotExist:
-            ProductInContainer.objects.create(product_id=product, count=count, damaged=source_container_objects.damaged, container_id=destination_container_id)
-
-        source_container_objects.count -= count
-        if source_container_objects.count <= 0:
-            source_container_objects.delete()
-        else:
-            source_container_objects.save()
-
-        return Response(status=status.HTTP_200_OK)
-        
-    def get_container_items(self, container: str, product: str):
-        return ProductInContainer.objects.get(product_id=product, container_id=container)
-
-    def has_required_properties(self, request):
-        if 'source_container' not in request.data:
-            return False
-
-        if 'destination_container' not in request.data:
-            return False
-
-        if 'product' not in request.data:
-            return False
-
-        if 'count' not in request.data:
-            return False
-        
-        return True
-
-
 class MoveDropzone(APIView):
     def post(self, request):
         containers, dropzone = request.data['containers'], request.data['dropzone']
+        dz = Dropzone.objects.filter(pk=dropzone)
+
+        if not dz.exists():
+            return Response(status=status.HTTP_403_FORBIDDEN)
+            
 
         for container in containers:
             c = StorageUnit.objects.filter(pk=container)
 
             if c.exists():
                 c = c.first()
-                c.dropzone = Dropzone.objects.get(pk=dropzone)
+                c.dropzone = dz.first()
                 c.save()
         
         return Response(status=status.HTTP_200_OK)
@@ -228,7 +165,6 @@ class AddItemsContainer(APIView):
 
         c, created = StorageUnit.objects.get_or_create(id=container)
 
-        print(products)
         for p in products:
             pr = ProductInContainer.objects.filter(product_id = p['product'], container=c)
 
