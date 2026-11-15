@@ -80,7 +80,14 @@ class StorageUnit(models.Model):
             current_weight += i.product.weight * i.count
 
         return (weight + current_weight) <= self.max_weight if self.max_weight > 0 else True
-    
+
+    @classmethod
+    def get_amnesty_sellable_container(cls):
+        return StorageUnit.objects.get_or_create(id='AMNESTYDESEL')[0]
+
+    @classmethod
+    def get_amnesty_unsellable_container(cls):
+        return StorageUnit.objects.get_or_create(id='AMNESTYUNSEL')[0]
 
 class ProductInContainer(models.Model):
     container = models.ForeignKey(StorageUnit, on_delete=models.CASCADE, related_name='items')

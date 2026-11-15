@@ -85,12 +85,14 @@ class StowItem(APIView):
         
         try:
             with transaction.atomic():
-                return self._stow_item(request)
+                self._products = ProductInContainer.objects.select_for_update() 
+                return self._stow_selected_products(request)
         except StowError as e:
+            self._products = []
             return Response({'reason': e.reason}, status = status.HTTP_403_FORBIDDEN)
         
 
-    def _stow_item(self, request):
+    def _stow_selected_products(self, request):
         source_container, destination_container_id = request.data['container'], request.data['target_bin']
 
         products = request.data['products']
@@ -142,7 +144,7 @@ class StowItem(APIView):
         return Response(status=status.HTTP_200_OK)
         
     def get_container_items(self, container: str, product: str):
-        return ProductInContainer.objects.get(product_id=product, container_id=container)
+        return self._products.get(product_id=product, container_id=container)
 
 
 class EndStowSession(APIView):
@@ -159,21 +161,18 @@ class EndStowSession(APIView):
                 if not products.exists():
                     continue
 
-                count_missing = products.aggregate(count=   Sum("count", outputField=models.IntegerField(), default=0))['count']
+                count_missing += products.aggregate(count = Sum("count", outputField=models.IntegerField(), default=0))['count']
 
                 if count_missing >= 4:
-                    return Response({'reason': 'Too many products not stowed'}, status=status.HTTP_400_BAD_REQUEST)
+                    raise StowError(reason='Too many products not stowed')
 
-                print(len(products))
-                location = StorageUnit.objects.get(pk='LOCAMNESTYDE')
+                location = StorageUnit.get_amnesty_sellable_container()
 
                 if products.first().damaged:
-                    location = StorageUnit.objects.get(pk='LOCAMNESTYUN')
+                    location = StorageUnit.get_amnesty_unsellable_container()
 
                 for p in products:
                     loc = location.items.all().filter(product=p.product)
-
-                    print(loc.exists())
                     if loc.exists():
                         loc.count += p.count
                         p.delete()
